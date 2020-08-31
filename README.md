@@ -29,6 +29,11 @@ out = getMetadata(czi, cfilefull)
 Given an open Bio-Format file, outputs key metadata in the order and 
 format required by the database. Must have Bio-Formats installed. 
 
+rotation = getRotation(image, figHandle)
+Given an image, display it and ask the user whether rotation is needed,
+and how much, until the user is satisfied with the figure. Optional
+arguement figureHandle allows control over figure output.
+
 randomRename() asks the user for an input directory and an output 
 directory. it then generates a random permutation of the vector of 
 numbers from 1 to n, where n is the number of files. it then copies 
