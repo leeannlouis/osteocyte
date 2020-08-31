@@ -1,4 +1,7 @@
 function [maxVers, theFileName] = getMaxFileVers(theDir, nameFormat)
+% Given a directory the format of the file name of interest, gets the 
+% maximum version number. Assumes version is in the format "v\d+" in the 
+% file name. Outpus the version number and the full file name.
 
 % Get the listing of files with the name format
 theListing = dir(theDir);
