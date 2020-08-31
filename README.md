@@ -1,11 +1,13 @@
 # osteocyte
 functions and scripts for analysis of image data of bone cells
 
-volComb = createOverlay(volume, volOver) takes a grayscale volume 
-(volume) and a binary volume (volOver) and outputs a truecolor 
+volComb = createOverlay(volume, volOver, transparency) takes a grayscale 
+volume (volume) and a binary volume (volOver) and outputs a truecolor 
 volume where the binary volume is green. if sent to sliceViewer, this 
 shows the grayscale volume with the binary volume as a transparent 
-green overlay to check that the binary volume was created correctly
+green overlay to check that the binary volume was created correctly. 
+also takes optional variable transparency that indicates how 
+transparent (0) or opaque (1) the overlay is.
 
 randomRename() asks the user for an input directory and an output 
 directory. it then generates a random permutation of the vector of 
