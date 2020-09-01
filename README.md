@@ -34,6 +34,13 @@ Given an image, display it and ask the user whether rotation is needed,
 and how much, until the user is satisfied with the figure. Optional
 arguement figureHandle allows control over figure output.
 
+osteocyteMetadataCollection takes one or more .czi files requested from the 
+user. Checks whether they are in the metadata database; if not, adds them 
+and creates a new version of the data base.
+Must have Bio-Formats installed. Put it in the toolbox folder and then
+use the pathtool to ensure it is included.
+https://docs.openmicroscopy.org/bio-formats/6.1.0/developers/matlab-dev.html
+
 randomRename() asks the user for an input directory and an output 
 directory. it then generates a random permutation of the vector of 
 numbers from 1 to n, where n is the number of files. it then copies 
