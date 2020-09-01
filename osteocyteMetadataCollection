@@ -11,12 +11,10 @@ clear; clc;
 
 % Setup
 cDir = uigetdir('', 'Where is the code?');
-%cDir = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\src';
 cd(cDir);
 
 % Get the directory containing the metadata
 dDir = uigetdir('', 'Where is the metadata stored?');
-%dDir = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\data\metadata';
 
 % Get the latest version of the metadata table
 [maxVers, metaFile] = getMaxFileVers(dDir, 'osteocyteMetadata');
