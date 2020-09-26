@@ -1,6 +1,10 @@
 function out = getMetadata(czi, cfilefull)
-% Given an open Bio-Format file, outputs key metadata in the order and 
-% format required by the database. Must have Bio-Formats installed. 
+% Given a Bio-Formats file (czi) and its full file name (cfilefull), 
+% extracts key metadata: image height, image width, number of slices, 
+% resolutions in the XY and Z planes, pinhole size, detector zoom, date and 
+% time acquired, rotations applied, sample number, region (top or bottom),
+% section (1 or 2) and any notes. Outputs these as a cell array (out) in
+% the order required by the database. Must have Bio-Formats installed. 
 
 % Get the metadata
 metadata = czi{1, 4};
@@ -41,7 +45,8 @@ cfile = regexp(cfilefull, '[\w-]+.czi', 'match');
 
 % Extract sample info from the filename, including sample number, region
 % (top or bottom), and section (1 or 2)
-fInfo = regexp(cfilefull, 'samp(?<sample>\d+)\w_reg(?<reg>\w)_sec(?<sec>\d)', 'names');
+expression = 'samp(?<sample>\d+)\w_reg(?<reg>\w)_sec(?<sec>\d)';
+fInfo = regexp(cfilefull, expression, 'names');
 sampNum = str2double(fInfo.sample); 
 region = fInfo.reg; 
 section = str2double(fInfo.sec);
@@ -54,12 +59,9 @@ else
     note = nInfo.note;
 end
 
-% Collect the metadata. Note that the first column is a unique key index,
-% which must be edited prior to appending this data to the dataset.
-out = horzcat(1, {directory}, cfile, sampNum, {region}, section, ...
+% Collect the metadata
+out = horzcat({directory}, cfile, sampNum, {region}, section, ...
     dateAcquired, timeAcquired, xstep, zstep, pinholeSize, ...
     detectorZoom, rot, {note});
 
 end 
-
-
