@@ -2,36 +2,29 @@
 % Take one or more .czi files requested from the user. Checks whether they
 % are in the metadata database; if not, adds them and creates a new version
 % of the data base.
-% Must have Bio-Formats installed. Put it in the toolbox folder and then
-% use the pathtool to ensure it is included.
-% https://docs.openmicroscopy.org/bio-formats/6.1.0/developers/matlab-dev.html
+
+% Must have Bio-Formats MATLAB Toolbox installed. Download bfmatlab.zip
+% from the page below and add to the toolbox using the pathtool
+% https://www.openmicroscopy.org/bio-formats/downloads/
 
 % Clear
 clear; clc;
 
-% Setup
-cDir = uigetdir('', 'Where is the code?');
-cd(cDir);
-
 % Get the directory containing the metadata
-dDir = uigetdir('', 'Where is the metadata stored?');
+%dDir = uigetdir('', 'Where to output metadata file copy?');
+dDir = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\data\metadata';
 
-% Get the latest version of the metadata table
-[maxVers, metaFile] = getMaxFileVers(dDir, 'osteocyteMetadata');
+% Connect to the osteocyte.db database
+%[dbfile, dbpath] = uigetfile('\*.db', 'Choose the .db file');
+dbpath = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\analyses';
+dbfile = 'osteocyte.db';
+mksqlite('open', fullfile(dbpath, dbfile));
 
-% Load the metadata table
-metaTable = readtable(fullfile(dDir, metaFile), 'ReadVariableNames', true);
-metaTableNew = metaTable;    % New table to store new metadata results
-
-% Get the number for the next new key
-if isempty(metaTable.Index)
-    newKeyIdx = 1;
-else
-    newKeyIdx = max(metaTable.Index) + 1;
-end
+% Get today string for future use
+todayStr = getTodayStr();
 
 % Get the .czi file(s) to analyze
-[cfiles, path] = uigetfile(['C:\Users\Leeann\OneDrive - CUNY\' ...
+[cfiles, cpath] = uigetfile(['C:\Users\Leeann\OneDrive - CUNY\' ...
     'project_osteocyte\data\*.czi'], 'Choose the .czi file(s)', ...
     'Multiselect', 'on');
 
@@ -46,30 +39,31 @@ for cidx = 1:size(cfiles, 2)
     
     % Get the current file
     cfile = cfiles{cidx};
-    
+
     % Check whether the file is already in the metadata table
-    if ~any(strcmpi(cfile, metaTable.('FileName')))
+    priorData = mksqlite(['SELECT * FROM scans WHERE FileName = "', cfile, '"']);
+    if isempty(priorData)
 
         % If no data exists, try to open the file
         try
             
             % Try to open. Use evalc to suppress text output of bfopen
             fprintf('Trying to open %s... ', cfile)
-            [~, data] = evalc('bfopen([path, cfile])');
+            [~, data] = evalc('bfopen([cpath, cfile])');
             fprintf('opened.\n')
 
             % Try to get the metadata
             try
                 fprintf('Collecting metadata for %s... ', cfile)
-                newData = getMetadata(data, [path, cfile]);
+                newData = getMetadata(data, [cpath, cfile]);
                 fprintf('collected.\n\n', cfile)
-            
-                % Fix the key index
-                newData{1} = newKeyIdx;
-                newKeyIdx = newKeyIdx + 1;
-
-                % Append table with metadata
-                metaTableNew = vertcat(metaTableNew, newData);
+                
+                % Add the data to the database
+                values_to_add = createSqlValueList(newData);
+                mksqlite(['INSERT INTO scans(DataDirectory, FileName, ', ...
+                    'SampleID, Region, Section, DateAcquired, TimeAcquired, ', ...
+                    'PixelSizeXY_um, PixelSizeZ_um, PinholeSize_um, ', ...
+                    'ScanZoom, ScanRotation, Note) VALUES (', values_to_add, ')']);
                 
             catch
                 fprintf(' not in the proper file name format. Skipped.\n\n', cfile)
@@ -87,28 +81,12 @@ for cidx = 1:size(cfiles, 2)
     
 end
 
-% If you got data, add it and create a new excel file.
-if size(metaTableNew, 1) ~= size(metaTable, 1)
+% Get a copy of the metadata datasheet using a SQL command. It comes out 
+% as a structure, convert to a table.
+newTable = struct2table(mksqlite('SELECT * FROM scans'));
+fileNameOut = ['scans-', todayStr, '.csv'];
+writetable(newTable, fullfile(dDir, fileNameOut));
+fprintf(['New file created: ', fileNameOut, '\n']);
 
-    % Get the new version number. Add a 0 in front of it if needed.
-    newVers = maxVers + 1;
-    versName = num2str(newVers, '%02.f');
-    
-    % Get the date in the proper format
-    t = today('datetime');
-    t.Format = 'yyyyMMdd';
-    t = char(t);
-    
-    % Get the full file name
-    fileout = ['osteocyteMetadata-v', versName, '-', t, '.xls'];
-
-    % Write the file
-    writetable(metaTableNew, fullfile(dDir, fileout));
-
-    fprintf(['New file created for new results: ', fileout, '\n']);
-    
-else
-    
-    fprintf('No new data, no file saved.\n');
-    
-end
+% Close the database
+mksqlite('close');
