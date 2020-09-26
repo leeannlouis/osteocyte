@@ -1,8 +1,10 @@
 function volComb = createOverlay(volume, volOver, transpareny)
-% Takes a grayscale volume (volume) and a binary volume (volOver) and
-% outputs a truecolor volume (colors are in the 4th dimension), where the
-% binary volume is in green. Can also take an optional transparency value,
-% that determines how transparent (0) or opaque (1) the green is.
+% Takes a grayscale volume (volume) and a binary volume (volOver) and 
+% outputs a truecolor volume where the binary volume is green. If passed to 
+% the sliceViewer function, this shows the grayscale volume with the 
+% binary volume as a transparent green overlay to check that the binary 
+% volume was created correctly. also takes optional variable transparency 
+% that indicates how transparent (0) or opaque (1) the overlay is.
 
 % Check for transparency value
 if ~exist('transparency', 'var')
