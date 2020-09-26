@@ -1,7 +1,12 @@
-function [x1, x2, y1, y2] = getCropXY(volume, figHandle)
-% Given an input volume, ask the user for the cropping region by looking at
-% the top and bottom slices. Ouputs the x and y coordinates of the cropping
-% region. Optional input for figure handle. 
+function [x1, x2, y1, y2] = getCropXY(volume, cropSetting, figHandle)
+% Given an input volume (volume), asks the user for the top left and bottom
+% right corners to use to crop the image. Does this twice. If 'cropSetting'
+% is 'inclusive', the largest area of the selected points is used. with
+% this setting, point click order does not matter. if 'cropSetting' is 
+% 'exclusive', it takes the smallest area given. The function then assumes
+% that points are clicked in the order 1) upper left, 2) lower right, 3) 
+% upper left, 4) lower right. Ouputs the x and y coordinates of the 
+% cropping region. Optional input for figure handle.
 
 % Check for figureHandle input
 if ~exist('figHandle', 'var')
@@ -67,18 +72,32 @@ while strcmpi(needsCrop, 'Y') || isempty(needsCrop)
             'Units', 'normalized', 'VerticalAlignment', 'top', 'Color', 'red');
         q = ginput(2);
 
-        % Get the x and y corner coordinates as integers
-        x1 = min([floor(p(1)), floor(p(2)), floor(q(1)), floor(q(2))]);
-        y1 = min([floor(p(3)), floor(p(4)), floor(q(3)), floor(q(4))]);
-        x2 = max([ceil(p(1)), ceil(p(2)), ceil(q(1)), ceil(q(2))]);
-        y2 = max([ceil(p(3)), ceil(p(4)), ceil(q(3)), ceil(q(4))]);
+        % Get the x and y corner coordinates as integers.
+        if strcmpi(cropSetting, 'inclusive')   
+            % To take the largest (inclusive) area input:
+            x1 = min([floor(p(1)), floor(p(2)), floor(q(1)), floor(q(2))]);
+            y1 = min([floor(p(3)), floor(p(4)), floor(q(3)), floor(q(4))]);
+            x2 = max([ceil(p(1)), ceil(p(2)), ceil(q(1)), ceil(q(2))]);
+            y2 = max([ceil(p(3)), ceil(p(4)), ceil(q(3)), ceil(q(4))]);
+            
+        elseif strcmpi(cropSetting, 'exclusive')
+            % To take the smallest area input (assumes first click is upper
+            % left and second click is upper right)
+            x1 = max([ceil(p(1)), ceil(q(1))]);
+            y1 = max([ceil(p(3)), ceil(q(3))]);
+            x2 = min([floor(p(2)), floor(q(2))]);
+            y2 = min([floor(p(4)), floor(q(4))]);
+            
+        else
+            error('Second arguement must be "inclusive" or "exclusive"');
+        end
 
         % Ensure the dimensions are within the original image
         [ymax, xmax] = size(imFirst);
-        if x1 < 1,    x1 = 1,   end
-        if y1 < 1,    y1 = 1,   end
-        if x2 > xmax, x2 = xmax,    end
-        if y2 > ymax, y2 = ymax,    end
+        if x1 < 1,    x1 = 1;   end
+        if y1 < 1,    y1 = 1;   end
+        if x2 > xmax, x2 = xmax;    end
+        if y2 > ymax, y2 = ymax;    end
         hold off; 
         
     end
