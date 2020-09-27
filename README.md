@@ -40,4 +40,4 @@ Once new bone image data in .czi format are acquired the procedure is:
 
 ## Images
 Images come from thin slices cut from bones which are fluorescently labeled with a red dye and then imaged using a microscope. The code was written for Zeiss-branded microscopes, which produce files in the .czi format. These files can be read using the [Bio-Formats open software](https://www.openmicroscopy.org/bio-formats/). A sample image is shown below. These typically are taken as stacks of images to visualize a volume.
-<img src="images/sample_preprocessed.tif" width="500">
+<img src="images/sample_preprocessed.png" width="500">
