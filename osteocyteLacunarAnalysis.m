@@ -1,32 +1,42 @@
 %% Osteocyte lacunar counting analysis
-% Take a set of .tif stack(s) and return the number of osteocytes in their
-% top, middle, and bottom sections in an excel sheet and a labeled volume.
+% Takes a .tif stack(s) as created by osteocyteLacunarProcessing and finds
+% osteocytes (bright labelled cells) in the image. Divides these into top,
+% middle, an bottom based on their centroid locations. Stores the numbers
+% of osteocytes in each section in the database and three .tif stack
+% volumes, which can be passed to createOverlay.m or createOverlayRGB.m to
+% create overlays, then to sliceViewer to see where these osteocytes are.
+
 % To try different analysis settings (number of erosions or dilations, size
 % or shape of structuring element used), change the variables under the
-% heading "ANALYSIS SETTINGS"
+% heading "ANALYSIS SETTINGS".
+
+% Requires Image Processing Toolbox (shapes, erosions, dilations), and
+% sqlite3 + mksqlite for database work
+
+% Note: this currently takes ~2 min per tif stack
 
 % Setup 
-% cd(); % Change to directory with your custom functions
 clear; clc; close all;
 
 % Get the output data directory
 oDir = uigetdir('', 'Where to output images and data?');
 
-% Get the analysis table and make a copy for concatenation
-[maxVers, aFile] = getMaxFileVers(oDir, 'lacunarDensityAnalyses-Auto');
-aTable = readtable(fullfile(oDir, aFile), 'ReadVariableNames', true);
-aTableNew = aTable;     % Create a copy
+% Connect to the osteocyte.db database
+[dbfile, dbpath] = uigetfile('\*.db', 'Choose the .db file');
+mksqlite('open', fullfile(dbpath, dbfile));
+
+% Get today string for future use
+todayStr = getTodayStr();
 
 %%%     ANALYSIS SETTINGS   %%%
-se = strel('cuboid', [4 6 6]); 
+se = strel('rectangle', [6 6]); 
 numErosions = 4; 
 numDilations = 3;
-mySettings = ['Gaussian Filtered, Threshold mean*1.9, ' ...
-    'se cuboid 4x6x6, 4x erosions, 3x dilations'];
-mySettingsExt = '_gauss-Cub4x6x6-Er4-Di3';
+mySettings = 'SeRec6x6Er4Di3';
+mySettingsExt = '';
 
 % Select file(s)
-[tfiles, tpath] = uigetfile([oDir, '\*.tif'], 'Choose the .tif file', ...
+[tfiles, tpath] = uigetfile([oDir, '\*.tif'], 'Choose the .tif file(s)', ...
     'Multiselect', 'on');
 
 % If only one file selected, convert to cell for the loop to run properly
@@ -43,10 +53,15 @@ for tIdx = 1:size(tfiles, 2)
     fprintf('Opening %s... ', tfile);
     volume = readMultipageTif(fullfile(tpath, tfile));
     fprintf('opened.\n');
-
-    % Create an empty version of the analysis table to collect the data
-    aTableAdd = array2table(cell(1, size(aTable, 2)), ...
-        'VariableNames', aTable.Properties.VariableNames);
+    
+    % Use the file name to find the resolutions from the database
+    resolutions = mksqlite(['SELECT scans.PixelSizeXY_um, ', ...
+        'scans.PixelSizeZ_um FROM processing ', ...
+        'LEFT JOIN scans ON scans.FileName = processing.InputFileName ', ...
+        'WHERE processing.OutputFileName = "', tfile, '"']); 
+    xstep = resolutions.PixelSizeXY_um; 
+    ystep = resolutions.PixelSizeXY_um;
+    zstep = resolutions.PixelSizeZ_um;
 
     % Convert volume from 0 255 to 0 to 1 (typical for image of type double)
     volume = mat2gray(volume);
@@ -73,48 +88,92 @@ for tIdx = 1:size(tfiles, 2)
     for i = 1:numDilations
         volDilated = imdilate(volDilated, se);
     end
-
-    % Remove objects on edges
+    
+    % Remove objects on edges (42% faster than removing small objects first)
     fprintf('removing edge objects... ');
     volNoEdges = imclearborder(volDilated);
+    
+    % Get a volume with labeled connected volumes
+    fprintf('finding objects... \n');
+    CC = bwconncomp(volNoEdges);    % get connected 3D objects
+    volObjs = labelmatrix(CC);      % change CC output to 3D
+    numObjs = CC.NumObjects;        % get the total objects found
+
+    % Get the volumes of all objects. Note that we could use bwareaopen 
+    % to remove small objects, but this assumes isotropic voxel size.
+    % In other words, each pixel has the same dimensions in x, y, and z.
+    % This is not the case. Insted, we need to calculate the object volumes
+    % given the pixel resolutions. Calculating volume in one line (summing 
+    % all voxels vs. going slice by slice) gives the same volume to e-12 um
+    % and is 44% faster. In the future, could try to use interpn in the 
+    % future to resize the volume for isotropic voxel size, then use 
+    % bwareaopen.
+    objVols = zeros(numObjs, 1);    % vector to store object volumes
+    fprintf('calculating object volumes... ');
+    for idxObj = 1:numObjs
+        
+        % Make the volume into 1's so you can sum them to get the volume
+        binaryObj = (volObjs == idxObj);
+        
+        % Volume is now just the sum of the 1's times the resolutions 
+        thisVol = sum(binaryObj(:)) * xstep * ystep * zstep;
+       
+        % Store the volume
+        objVols(idxObj) = thisVol;
+        
+    end
+
+    % Remove objects smaller than 100 um^3.
+    fprintf('removing objects smaller than 100 um^3...\n');
+    volOcys = volObjs;              % make a copy of the volume
+    for idxObj = 1:numObjs
+        if objVols(idxObj) < 100
+            volOcys(volOcys == idxObj) = 0;
+        end
+    end
 
     % Count the objects in the different regions
     fprintf('counting objects... '); 
-    [num_top, num_mid, num_bot, L] = getLacunarCounts(volNoEdges);
+    [num_top, num_mid, num_bot, L] = getLacunarCounts(volOcys);
+    num_tot = num_top + num_mid + num_bot;
     fprintf('done analyzing.\n');
 
-    % Create the multicolor volume
-    fprintf('Creating color volume... ');
-    volComb = createOverlayRGB(volume, L == 1, L == 2, L == 3);
-    fprintf('done.\n');
-
     % Save the volumes as three separate files (1top.tif, 2mid.tif, 3bot.tif), 
-    % and a single multicolor volume.
     fprintf('Saving all volumes... ')
     [~, fileOutName, ~] = fileparts(tfile);
-    fileOutName = [fileOutName, '_analy', getTodayStr(), mySettingsExt];
-    writeMultipageTif(L == 1, fullfile(oDir, [fileOutName, '_1top.tif']));
-    writeMultipageTif(L == 2, fullfile(oDir, [fileOutName, '_2mid.tif']));
-    writeMultipageTif(L == 3, fullfile(oDir, [fileOutName, '_3bot .tif']));
-    writeMultipageTif(volComb, fullfile(oDir, [fileOutName, '_4color.tif']));
+    fileOutName = [fileOutName, '_analy', todayStr, mySettingsExt];
+    fullFileOut = fullfile(oDir, '\output\', fileOutName);
+    writeMultipageTif(L == 1, [fullFileOut, '_1top.tif']);
+    writeMultipageTif(L == 2, [fullFileOut, '_2mid.tif']);
+    writeMultipageTif(L == 3, [fullFileOut, '_3bot .tif']);
     fprintf('done.\n')
-
-    % Collect the data for the output spreadsheet
-    aTableAdd.InputFileName = tfile;
-    aTableAdd.OutputFileName = fileOutName;
-    aTableAdd.DateAnalyzed = getTodayStr();
-    aTableAdd.Settings = mySettings;
-    aTableAdd.Threshold = threshold;
-    aTableAdd.Num_Top = num_top;
-    aTableAdd.Num_Mid = num_mid;
-    aTableAdd.Num_Bot = num_bot;
-    aTableAdd.Num_Tot = num_top + num_mid + num_bot;
-
-    % Append the data
-    aTableNew = vertcat(aTableNew, aTableAdd);
     
+    % Create and save the multicolor volume
+%     fprintf('Creating and saving color volume... ');
+%     volComb = createOverlayRGB(volume, L == 1, L == 2, L == 3);
+%     writeMultipageTif(volComb, [fullFileOut, '_4color.tif']));
+%     fprintf('done.\n');
+
+    % Collect the data to add and get it in the right format for use in a
+    % SQL query. That is, TEXT outputs have double quotes around them,
+    % numbers are converted to strings for use in the query, and all values
+    % are separated by commas
+    values_to_add = createSqlValueList({tfile, fileOutName, todayStr, ...
+        mySettings, threshold, num_top, num_mid, num_bot, num_tot});
+    
+    % Add the data to the database
+    mksqlite(['INSERT INTO lacunar_counts(InputFileName, OutputFileName, ' ...
+        'DateAnalyzed, Settings, Threshold, NumTop, NumMid, NumBot, NumTot) ' ...
+        'VALUES (', values_to_add, ')']);
+
 end
 
-% Save the new table data
-writeNewTable(aTable, aTableNew, oDir, 'lacunarDensityAnalyses-Auto', ...
-    maxVers + 1);
+% Get a copy of the new lacunar_count datasheet that you appended here
+% using a SQL command. It comes out as a structure, convert to a table.
+newTable = struct2table(mksqlite('SELECT * FROM lacunar_counts'));
+fileNameOut = ['lacunar_counts-', todayStr, '.csv'];
+writetable(newTable, fullfile(oDir, fileNameOut));
+fprintf(['New file created: ', fileNameOut, '\n']);
+
+% Close the database
+mksqlite('close');
