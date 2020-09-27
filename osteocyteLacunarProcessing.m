@@ -22,9 +22,7 @@ thickness = 30;     % in um. Crop all data to this thickness.
 oDir = uigetdir('', 'Analysis folder to output .csv and .tif files');
 
 % Connect to the osteocyte.db database
-%[dbfile, dbpath] = uigetfile('\*.db', 'Choose the .db file');
-dbpath = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\analyses';
-dbfile = 'osteocyte.db';
+[dbfile, dbpath] = uigetfile('\*.db', 'Choose the .db file');
 mksqlite('open', fullfile(dbpath, dbfile));
 
 % Get today string for future use
