@@ -145,7 +145,7 @@ for tIdx = 1:size(tfiles, 2)
     fullFileOut = fullfile(oDir, '\output\', fileOutName);
     writeMultipageTif(L == 1, [fullFileOut, '_1top.tif']);
     writeMultipageTif(L == 2, [fullFileOut, '_2mid.tif']);
-    writeMultipageTif(L == 3, [fullFileOut, '_3bot .tif']);
+    writeMultipageTif(L == 3, [fullFileOut, '_3bot.tif']);
     fprintf('done.\n')
     
     % Create and save the multicolor volume
