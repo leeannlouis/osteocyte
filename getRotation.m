@@ -11,7 +11,7 @@ end
 % Ask the user for input rotations until the rotation is correct
 needsRot = 'Y'; % Initialize user input variable
 rotation = 0;   % Initialize rotation variable
-while strcmpi(needsRot, 'Y') || isempty(needsRot)
+while strcmpi(needsRot, 'Y')
     
     % Rotate the slice by the given amount
     imRot = imrotate(image, rotation); 
@@ -24,7 +24,7 @@ while strcmpi(needsRot, 'Y') || isempty(needsRot)
     end
     
     % Ask user if the image needs to be rotated
-    needsRot = input('Does the image need to be rotated? Y/N [Y] ', 's');
+    needsRot = input('Does the image need to be rotated? Y/N [N] ', 's');
     
     % Check for incorrect responses
     while ~ismember(needsRot, {'Y', 'N', 'y', 'n', ''})
