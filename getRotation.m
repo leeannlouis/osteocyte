@@ -32,7 +32,7 @@ while strcmpi(needsRot, 'Y')
     end
     
     % Ask for rotation if requested
-    if strcmpi(needsRot, 'Y') || isempty(needsRot)
+    if strcmpi(needsRot, 'Y')
         rotation = input(['Rotation value (+CCW, -CW) (prior: ', ...
             num2str(rotation), '): ']);
         
