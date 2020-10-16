@@ -107,7 +107,7 @@ for cIdx = 1:size(cfiles, 2)
 
     % Get the cropping region in XY. Use an exclusive cropping region to
     % ensure that no external parts of 
-    [xmin, xmax, ymin, ymax] = getCropXY(volRot, 'exclusive');
+    [xmin, xmax, ymin, ymax] = getCropXY(volRot, 'exclusive', 'whole');
     volCrop = volRot(ymin:ymax, xmin:xmax, :);
 
     % Save the new volume in a multi-page tif with the same name as the
@@ -115,7 +115,7 @@ for cIdx = 1:size(cfiles, 2)
     [~, pFileName, ~] = fileparts(cfile);
     pFileName = [pFileName, '_proc', todayStr, '.tif'];
     fprintf(['Saving data with name ', char(pFileName), '... '])
-    %writeMultipageTif(volCrop, fullfile(oDir, pFileName));
+    writeMultipageTif(volCrop, fullfile(oDir, pFileName));
     fprintf('done. \n')
 
     % Collect the data to add and get it in the right format for use in a
