@@ -11,21 +11,17 @@
 clear; clc;
 
 % Get the directory containing the metadata
-%dDir = uigetdir('', 'Where to output metadata file copy?');
-dDir = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\data\metadata';
+dDir = uigetdir('', 'Where to output metadata file copy?');
 
 % Connect to the osteocyte.db database
-%[dbfile, dbpath] = uigetfile('\*.db', 'Choose the .db file');
-dbpath = 'C:\Users\Leeann\OneDrive - CUNY\project_osteocyte\analyses';
-dbfile = 'osteocyte.db';
+[dbfile, dbpath] = uigetfile('\*.db', 'Choose the .db file');
 mksqlite('open', fullfile(dbpath, dbfile));
 
 % Get today string for future use
 todayStr = getTodayStr();
 
 % Get the .czi file(s) to analyze
-[cfiles, cpath] = uigetfile(['C:\Users\Leeann\OneDrive - CUNY\' ...
-    'project_osteocyte\data\*.czi'], 'Choose the .czi file(s)', ...
+[cfiles, cpath] = uigetfile('', 'Choose the .czi file(s)', ...
     'Multiselect', 'on');
 
 % If only one file selected, make it a cell so that the rest of the code 
@@ -42,41 +38,52 @@ for cidx = 1:size(cfiles, 2)
 
     % Check whether the file is already in the metadata table
     priorData = mksqlite(['SELECT * FROM scans WHERE FileName = "', cfile, '"']);
-    if isempty(priorData)
+    redo = 'NA';
+    if ~isempty(priorData)
+        
+        % Ask user if they want to redo the processing
+        redo = input(['Data already exists for ', cfile, '. Redo? Y/N '], 's');
+        while ~ismember(redo, {'Y', 'N', 'y', 'n'})
+            redo = input('Invalid entry, try again. ', 's');
+        end
+        
+    end
+    
+    % If yes, continue and delete the old record
+    if ~ismember(redo, {'Y', 'y', 'NA'})
+        fprintf(['Skipping ', cfile, '.\n'])
+        continue
+    else
+        mksqlite(['DELETE FROM scans WHERE FileName = "', cfile, '"']);
+    end
+    
+    % Try to open the file
+    try
 
-        % If no data exists, try to open the file
+        % Try to open. Use evalc to suppress text output of bfopen
+        fprintf('Trying to open %s... ', cfile)
+        [~, data] = evalc('bfopen([cpath, cfile])');
+        fprintf('opened.\n')
+
+        % Try to get the metadata
         try
-            
-            % Try to open. Use evalc to suppress text output of bfopen
-            fprintf('Trying to open %s... ', cfile)
-            [~, data] = evalc('bfopen([cpath, cfile])');
-            fprintf('opened.\n')
+            fprintf('Collecting metadata for %s... ', cfile)
+            newData = getMetadata(data, [cpath, cfile]);
+            fprintf('collected.\n\n', cfile)
 
-            % Try to get the metadata
-            try
-                fprintf('Collecting metadata for %s... ', cfile)
-                newData = getMetadata(data, [cpath, cfile]);
-                fprintf('collected.\n\n', cfile)
-                
-                % Add the data to the database
-                values_to_add = createSqlValueList(newData);
-                mksqlite(['INSERT INTO scans(DataDirectory, FileName, ', ...
-                    'SampleID, Region, Section, DateAcquired, TimeAcquired, ', ...
-                    'PixelSizeXY_um, PixelSizeZ_um, PinholeSize_um, ', ...
-                    'ScanZoom, ScanRotation, Note) VALUES (', values_to_add, ')']);
-                
-            catch
-                fprintf(' not in the proper file name format. Skipped.\n\n', cfile)
-            end
+            % Add the data to the database
+            values_to_add = createSqlValueList(newData);
+            mksqlite(['INSERT INTO scans(DataDirectory, FileName, ', ...
+                'SampleID, Region, Section, DateAcquired, TimeAcquired, ', ...
+                'PixelSizeXY_um, PixelSizeZ_um, PinholeSize_um, ', ...
+                'ScanZoom, ScanRotation, Note) VALUES (', values_to_add, ')']);
 
         catch
-            fprintf(' not a BioFormats file. Skipped.\n\n', cfile)
+            fprintf(' not in the proper file name format. Skipped.\n\n', cfile)
         end
 
-    else
-        % If data already exists, skip the file
-        fprintf('Data for %s already exists. Did not collect metadata.\n', cfile);
-
+    catch
+        fprintf(' not a BioFormats file. Skipped.\n\n', cfile)
     end
     
 end
