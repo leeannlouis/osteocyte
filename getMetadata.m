@@ -27,7 +27,7 @@ detectorZoom = str2double(metadata.getDetectorZoom(0, 0));
 
 % Extract the timestamp of the scan. Convert the date to a number with
 % format 'YYYYMMDD', and time with format 'HHMM' in 24 hr format.
-dateTimeAcquired = char(metadata.getImageAcquisitionDate(0));
+dateTimeAcquired = hash.get('Global Information|Document|CreationDate #1');
 dateTimeStruct = regexp(dateTimeAcquired, '(?<date>\d+-\d+-\d+)T(?<time>\d+:\d+)', 'names');
 dateAcquired = str2double(erase(dateTimeStruct.date, '-')); 
 timeAcquired = str2double(erase(dateTimeStruct.time, ':'));
